@@ -44,8 +44,10 @@ func main() {
 }
 var localPort = "5000"
 func handleRequest(conn *websocket.Conn, req protocol.Message) {
-	url := "http://localhost:" + localPort
-
+// Build final localhost URL
+// Example:
+// http://localhost:5000/api/users
+url := "http://localhost:" + localPort + req.Path
 	httpReq, err := http.NewRequest(
 		req.Method,
 		url,
