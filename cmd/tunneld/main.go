@@ -5,6 +5,7 @@ import (
 	"fmt"
 	"io"
 	"strings"
+	"time"
 
 	// "bytes"
 	"net/http"
@@ -182,20 +183,53 @@ func tunnelHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// WAIT for client response
-	response := <-responseChan
+	// Wait for either:
+// 1. response from client
+// 2. timeout after 10 seconds
+select {
+
+// Case 1:
+// Response received successfully
+case response := <-responseChan:
 
 	fmt.Println("Response received from client")
-for key, value := range response.Headers {
 
-	// Set response header
-	w.Header().Set(key, value)
-}
-	// Send status code back to browser
+	// Apply response headers
+	for key, value := range response.Headers {
+		w.Header().Set(key, value)
+	}
+
+	// Send status code
 	w.WriteHeader(response.StatusCode)
 
-	// Send body back to browser
+	// Send response body
 	w.Write(response.Body)
+
+// Case 2:
+// Timeout triggered
+case <-time.After(10 * time.Second):
+
+	fmt.Println("Request timeout")
+
+	// Send timeout error to browser
+	http.Error(
+		w,
+		"Tunnel request timeout",
+		http.StatusGatewayTimeout,
+	)
+}
+
+// 	fmt.Println("Response received from client")
+//   for key, value := range response.Headers {
+
+// 	// Set response header
+// 	w.Header().Set(key, value)
+// }
+// 	// Send status code back to browser
+// 	w.WriteHeader(response.StatusCode)
+
+// 	// Send body back to browser
+// 	w.Write(response.Body)
 
 	// Cleanup response channel
 	tunnel.Mutex.Lock()

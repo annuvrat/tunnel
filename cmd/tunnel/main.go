@@ -6,6 +6,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
@@ -15,7 +16,8 @@ import (
 
 // Stores local port from CLI flag
 var localPort string
-
+// Protect websocket writes
+var writeMutex sync.Mutex
 // Root CLI command
 // Example:
 // tunnel
@@ -77,7 +79,7 @@ var connectCmd = &cobra.Command{
 
 			// Handle forwarded request
 			if req.Type == "request" {
-				handleRequest(conn, req)
+				go handleRequest(conn, req)
 			}
 		}
 	},
@@ -167,5 +169,12 @@ func handleRequest(conn *websocket.Conn, req protocol.Message) {
 	}
   fmt.Println(responseMsg)
 	// Send response through websocket
-	conn.WriteJSON(responseMsg)
+// Lock before websocket write
+writeMutex.Lock()
+
+// Unlock when function ends
+defer writeMutex.Unlock()
+
+// Safe websocket write
+conn.WriteJSON(responseMsg)
 }
