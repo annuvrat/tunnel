@@ -139,6 +139,12 @@ func tunnelHandler(w http.ResponseWriter, r *http.Request) {
 	// Generate unique request ID
 	requestID := uuid.New().String()
 
+
+	headers := make(map[string]string)
+
+	for key,values := range r.Header{
+		headers[key] = values[0]
+	}
 	// Create protocol message
 	msg := protocol.Message{
 		Type:      "request",
@@ -148,6 +154,7 @@ func tunnelHandler(w http.ResponseWriter, r *http.Request) {
 		// IMPORTANT:
 		// Send correct forwarded path
 		Path: forwardPath,
+		Headers: headers,
 
 		Body: body,
 	}
@@ -179,7 +186,11 @@ func tunnelHandler(w http.ResponseWriter, r *http.Request) {
 	response := <-responseChan
 
 	fmt.Println("Response received from client")
+for key, value := range response.Headers {
 
+	// Set response header
+	w.Header().Set(key, value)
+}
 	// Send status code back to browser
 	w.WriteHeader(response.StatusCode)
 
