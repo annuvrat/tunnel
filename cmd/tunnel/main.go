@@ -2,16 +2,17 @@ package main
 
 import (
 	"bytes"
+	"crypto/tls"
 	"fmt"
 	"io"
 	"log"
 	"net/http"
 	"sync"
 
+	clientpkg "github.com/annuvrat/tunnel/internal/client"
+	"github.com/annuvrat/tunnel/internal/protocol"
 	"github.com/gorilla/websocket"
 	"github.com/spf13/cobra"
-
-	"github.com/annuvrat/tunnel/internal/protocol"
 )
 
 // Stores local port from CLI flag
@@ -41,10 +42,25 @@ var connectCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		// Connect websocket to tunnel server
-		conn, _, err := websocket.DefaultDialer.Dial(
-			"ws://localhost:8080/ws",
-			nil,
-		)
+		dialer := websocket.Dialer{
+	TLSClientConfig: &tls.Config{
+		InsecureSkipVerify: true,
+	},
+}
+
+conn, _, err := dialer.Dial(
+	"wss://localhost/ws",
+	nil,
+)
+		// Create client instance
+    client := &clientpkg.Client{
+	Conn: conn,
+
+	// Buffered outgoing queue
+	Send: make(chan protocol.Message, 100),
+}
+// Start websocket writer goroutine
+go client.WritePump()
 
 		if err != nil {
 			log.Fatal(err)
@@ -79,7 +95,7 @@ var connectCmd = &cobra.Command{
 
 			// Handle forwarded request
 			if req.Type == "request" {
-				go handleRequest(conn, req)
+				go handleRequest(client, req)
 			}
 		}
 	},
@@ -112,7 +128,7 @@ func main() {
 	}
 }
 
-func handleRequest(conn *websocket.Conn, req protocol.Message) {
+func handleRequest(client *clientpkg.Client, req protocol.Message) {
 
 	// Build localhost URL
 	url := "http://localhost:" + localPort + req.Path
@@ -135,10 +151,10 @@ func handleRequest(conn *websocket.Conn, req protocol.Message) {
 		httpReq.Header.Set(key, value)
 	}
 
-	client := &http.Client{}
+	httpClient := &http.Client{}
 
 	// Send request to localhost
-	resp, err := client.Do(httpReq)
+	resp, err := httpClient.Do(httpReq)
 
 	if err != nil {
 		fmt.Println("Request failed:", err)
@@ -170,11 +186,12 @@ func handleRequest(conn *websocket.Conn, req protocol.Message) {
   fmt.Println(responseMsg)
 	// Send response through websocket
 // Lock before websocket write
-writeMutex.Lock()
+// writeMutex.Lock()
 
-// Unlock when function ends
-defer writeMutex.Unlock()
+// // Unlock when function ends
+// defer writeMutex.Unlock()
 
 // Safe websocket write
-conn.WriteJSON(responseMsg)
+// Send message into outgoing queue
+client.Send <- responseMsg
 }

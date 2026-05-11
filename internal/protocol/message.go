@@ -5,7 +5,7 @@ type Message struct {
 	Type    string `json:"type"`
 	TunnelID string `json:"tunnel_id,omitempty"`
 	RequestID string `json:"request_id,omitempty"`
-
+Error string `json:"error,omitempty"`
 	Method string `json:"method,omitempty"`
 	Path  string `json:"path,omitempty"`
 	Headers map[string]string `json:"headers,omitempty"`

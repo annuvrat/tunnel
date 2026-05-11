@@ -6,7 +6,12 @@ import (
 	"github.com/annuvrat/tunnel/internal/protocol"
 )
 
-var (
-	ResponseChannels = make(map[string]chan protocol.Message)
-	Mutex            sync.Mutex
-)
+
+// Stores requestID -> response channel
+var ResponseChannels = make(map[string]chan protocol.Message)
+
+// Stores requestID -> tunnelID
+var RequestTunnelMap = make(map[string]string)
+
+// Shared mutex
+var Mutex sync.Mutex

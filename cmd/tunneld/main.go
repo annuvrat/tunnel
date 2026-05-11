@@ -25,17 +25,54 @@ var upgrader = websocket.Upgrader{
 
 func wsHandler(w http.ResponseWriter, r *http.Request) {
 	// Upgrade HTTP -> WebSocket
+	tunnelID := uuid.New().String()
 	conn, err := upgrader.Upgrade(w, r, nil)
+	// Runs whenever pong received
+conn.SetPongHandler(func(appData string) error {
+
+	fmt.Println("Pong received from:", tunnelID)
+
+	return nil
+})
 	if err != nil {
 		fmt.Println("Upgrade error:", err)
 		return
 	}
 
 	// Generate tunnel ID
-	tunnelID := uuid.New().String()
 
 	// Store connection
 	tunnel.Tunnels[tunnelID] = conn
+	// Start heartbeat goroutine
+go func() {
+
+	// Infinite loop
+	for {
+
+		// Wait 10 seconds between pings
+		time.Sleep(10 * time.Second)
+
+		fmt.Println("Sending ping to:", tunnelID)
+
+		// Send websocket ping frame
+		err := conn.WriteMessage(
+			websocket.PingMessage,
+			[]byte("ping"),
+		)
+
+		// If ping fails
+		// Connection probably dead
+		if err != nil {
+
+			fmt.Println("Heartbeat failed:", tunnelID)
+
+			// Close websocket
+			conn.Close()
+
+			return
+		}
+	}
+}()
 
 	fmt.Println("New tunnel connected:", tunnelID)
 
@@ -57,10 +94,44 @@ func wsHandler(w http.ResponseWriter, r *http.Request) {
 
 	err := conn.ReadJSON(&msg)
 	if err != nil {
-		fmt.Println("Client disconnected")
-		delete(tunnel.Tunnels, tunnelID)
-		break
+
+	fmt.Println("Client disconnected:", tunnelID)
+
+	// Remove tunnel connection
+	delete(tunnel.Tunnels, tunnelID)
+
+	// Lock shared maps
+	tunnel.Mutex.Lock()
+
+	// Loop through all active requests
+	for requestID, ownerTunnelID := range tunnel.RequestTunnelMap {
+
+		// If request belongs to disconnected tunnel
+		if ownerTunnelID == tunnelID {
+
+			// Find response channel
+			ch, exists := tunnel.ResponseChannels[requestID]
+
+			if exists {
+
+				// Send error response
+				ch <- protocol.Message{
+					Type:  "error",
+					Error: "Tunnel client disconnected",
+				}
+			}
+
+			// Cleanup maps
+			delete(tunnel.ResponseChannels, requestID)
+			delete(tunnel.RequestTunnelMap, requestID)
+		}
 	}
+
+	// Unlock maps
+	tunnel.Mutex.Unlock()
+
+	break
+}
 
 	if msg.Type == "response" {
 		tunnel.Mutex.Lock()
@@ -170,6 +241,8 @@ func tunnelHandler(w http.ResponseWriter, r *http.Request) {
 	// Store response channel
 	tunnel.ResponseChannels[requestID] = responseChan
 
+	tunnel.RequestTunnelMap[requestID] = tunnelID
+
 	// Unlock after modification
 	tunnel.Mutex.Unlock()
 
@@ -186,11 +259,23 @@ func tunnelHandler(w http.ResponseWriter, r *http.Request) {
 	// Wait for either:
 // 1. response from client
 // 2. timeout after 10 seconds
+
 select {
 
 // Case 1:
 // Response received successfully
+
 case response := <-responseChan:
+	if response.Type == "error" {
+
+	http.Error(
+		w,
+		response.Error,
+		http.StatusBadGateway,
+	)
+
+	return
+}
 
 	fmt.Println("Response received from client")
 

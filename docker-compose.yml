@@ -1,0 +1,59 @@
+version: "3.9"
+
+services:
+
+  # Tunnel server container
+  tunnel-server:
+
+    # Build using local Dockerfile
+    build: .
+
+    # Container name
+    container_name: tunnel-server
+
+    # Restart automatically if crashed
+    restart: unless-stopped
+
+    # Internal Docker network
+    networks:
+      - tunnel-network
+
+  # Caddy reverse proxy
+  caddy:
+
+    # Official Caddy image
+    image: caddy:latest
+
+    # Container name
+    container_name: caddy
+
+    # Restart automatically
+    restart: unless-stopped
+
+    # Public ports
+    ports:
+      - "80:80"
+      - "443:443"
+
+    # Mount Caddy config
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile
+
+      # Persist SSL certificates
+      - caddy_data:/data
+
+      # Persist config
+      - caddy_config:/config
+
+    # Same Docker network
+    networks:
+      - tunnel-network
+
+# Docker network
+networks:
+  tunnel-network:
+
+# Persistent Docker volumes
+volumes:
+  caddy_data:
+  caddy_config:

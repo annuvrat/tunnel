@@ -1,0 +1,5 @@
+localhost {
+
+	# Reverse proxy to tunnel server container
+	reverse_proxy tunnel-server:8080
+}
