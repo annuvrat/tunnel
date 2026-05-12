@@ -68,9 +68,9 @@ tunnel.exe http 5000
 ```
 
 Example output:
-![alt text](./assets/image.png)
 ```text
 ✔ Tunnel established
+![alt text](./assets/logs.png)
 
 Forwarding:
 https://localhost/t/abc123
