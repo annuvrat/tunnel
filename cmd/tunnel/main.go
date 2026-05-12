@@ -7,8 +7,10 @@ import (
 	"io"
 	"log"
 	"net/http"
-	"sync"
-
+	"os"
+"os/signal"
+"syscall"
+"github.com/fatih/color"
 	clientpkg "github.com/annuvrat/tunnel/internal/client"
 	"github.com/annuvrat/tunnel/internal/protocol"
 	"github.com/gorilla/websocket"
@@ -18,7 +20,6 @@ import (
 // Stores local port from CLI flag
 var localPort string
 // Protect websocket writes
-var writeMutex sync.Mutex
 // Root CLI command
 // Example:
 // tunnel
@@ -30,17 +31,26 @@ var rootCmd = &cobra.Command{
 // Connect command
 // Example:
 // tunnel connect --local 5000
-var connectCmd = &cobra.Command{
+var httpCmd = &cobra.Command{
 
 	// Command name
-	Use: "connect",
+	Use: "http [port]",
 
 	// Short help description
-	Short: "Connect local server to tunnel",
+	Short: "Expose local HTTP server",
 
 	// This function runs when command executes
 	Run: func(cmd *cobra.Command, args []string) {
+		printBanner()
+		
+if len(args) < 1 {
 
+	fmt.Println("Usage: tunnel http <port>")
+	return
+}
+
+// Store local port
+localPort = args[0]
 		// Connect websocket to tunnel server
 		dialer := websocket.Dialer{
 	TLSClientConfig: &tls.Config{
@@ -65,6 +75,30 @@ go client.WritePump()
 		if err != nil {
 			log.Fatal(err)
 		}
+		// NOW conn exists safely
+
+signalChan := make(chan os.Signal, 1)
+
+signal.Notify(
+	signalChan,
+	os.Interrupt,
+	syscall.SIGTERM,
+)
+
+go func() {
+
+	<-signalChan
+
+	fmt.Println()
+
+	color.Yellow("Shutting down tunnel...")
+
+	conn.Close()
+
+	color.Green("Tunnel closed successfully.")
+
+	os.Exit(0)
+}()
 
 		// Read initial tunnel message
 		var msg protocol.Message
@@ -75,9 +109,48 @@ go client.WritePump()
 			log.Fatal(err)
 		}
 
-		fmt.Println("Tunnel established!")
-		fmt.Println("Tunnel ID:", msg.TunnelID)
+	// Empty line for spacing
+fmt.Println()
 
+// Success message
+color.Green("✔ Tunnel established")
+
+// Empty line
+fmt.Println()
+
+// Forwarding section
+color.Cyan("Forwarding:")
+
+// Public URL
+color.Blue(
+	"https://localhost/t/%s",
+	msg.TunnelID,
+)
+
+// Visual arrow
+fmt.Println("   ↓")
+
+// Local URL
+color.Yellow(
+	"http://localhost:%s",
+	localPort,
+)
+
+
+// Empty line
+fmt.Println()
+
+// Status info
+color.Green("Status: connected")
+
+// Transport info
+color.Cyan("Protocol: HTTPS + WSS")
+
+// Empty line
+fmt.Println()
+
+// Exit help
+color.White("Press Ctrl+C to stop")
 		// Infinite loop
 		// Wait for requests from server
 		for {
@@ -91,7 +164,6 @@ go client.WritePump()
 				log.Fatal(err)
 			}
 
-			fmt.Println("Received request from tunnel server")
 
 			// Handle forwarded request
 			if req.Type == "request" {
@@ -105,19 +177,31 @@ go client.WritePump()
 func init() {
 
 	// Add connect command to root
-	rootCmd.AddCommand(connectCmd)
+	rootCmd.AddCommand(httpCmd)
 
 	// Define --local flag
 	// Example:
 	// --local 5000
-	connectCmd.Flags().StringVar(
-		&localPort,
-		"local",
-		"5000",
-		"Local port to forward",
-	)
-}
 
+}
+func printBanner() {
+
+	// Cyan ASCII logo
+	color.Cyan(`
+████████╗██╗   ██╗███╗   ██╗███╗   ██╗███████╗██╗     
+╚══██╔══╝██║   ██║████╗  ██║████╗  ██║██╔════╝██║     
+   ██║   ██║   ██║██╔██╗ ██║██╔██╗ ██║█████╗  ██║     
+   ██║   ██║   ██║██║╚██╗██║██║╚██╗██║██╔══╝  ██║     
+   ██║   ╚██████╔╝██║ ╚████║██║ ╚████║███████╗███████╗
+   ╚═╝    ╚═════╝ ╚═╝  ╚═══╝╚═╝  ╚═══╝╚══════╝╚══════╝
+`)
+
+	// Small subtitle
+	color.White("Secure localhost tunneling for developers")
+
+	// Empty spacing
+	fmt.Println()
+}
 func main() {
 
 	// Execute CLI
@@ -133,7 +217,6 @@ func handleRequest(client *clientpkg.Client, req protocol.Message) {
 	// Build localhost URL
 	url := "http://localhost:" + localPort + req.Path
 
-	fmt.Println("Forwarding to:", url)
 
 	// Create HTTP request
 	httpReq, err := http.NewRequest(
@@ -161,7 +244,6 @@ func handleRequest(client *clientpkg.Client, req protocol.Message) {
 		return
 	}
 
-	fmt.Println("Received response from localhost")
 
 	defer resp.Body.Close()
 
@@ -183,7 +265,13 @@ func handleRequest(client *clientpkg.Client, req protocol.Message) {
 		Headers:    responseHeaders,
 		Body:       body,
 	}
-  fmt.Println(responseMsg)
+
+	fmt.Printf(
+	"%-6s %-20s %d\n",
+	req.Method,
+	req.Path,
+	resp.StatusCode,
+)
 	// Send response through websocket
 // Lock before websocket write
 // writeMutex.Lock()
