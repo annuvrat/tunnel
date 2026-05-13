@@ -59,7 +59,7 @@ localPort = args[0]
 }
 
 conn, _, err := dialer.Dial(
-	"wss://localhost/ws",
+	"wss://tunnel.annuvrat.com/ws",
 	nil,
 )
 		// Create client instance
@@ -123,7 +123,7 @@ color.Cyan("Forwarding:")
 
 // Public URL
 color.Blue(
-	"https://localhost/t/%s",
+	"https://tunnel.annuvrat.com/t/%s",
 	msg.TunnelID,
 )
 
