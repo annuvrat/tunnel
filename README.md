@@ -1,16 +1,14 @@
 # Tunnel
-![alt text](./assets/image.png)
+
+![Tunnel Demo](./assets/image.png)
 
 Secure localhost tunneling built in Go using WebSockets.
 
-Tunnel exposes your local HTTP server to the public internet through a secure reverse tunnel — similar to ngrok.
+Tunnel exposes your local HTTP server to the public internet through secure reverse tunnels — similar to ngrok.
 
-Built with:
-- Go
-- WebSockets
-- Docker
-- Caddy
-- Cobra CLI
+Public hosted server:
+
+https://tunnel.annuvrat.com
 
 ---
 
@@ -18,11 +16,12 @@ Built with:
 
 - Reverse HTTP tunneling
 - HTTPS public forwarding
-- WebSocket transport (WSS)
-- Concurrent request handling
+- Secure WebSocket transport (WSS)
+- Concurrent request handling with goroutines
 - Heartbeat monitoring
-- Graceful shutdown
-- Dockerized deployment
+- Graceful shutdown handling
+- Dockerized production deployment
+- Automatic HTTPS with Caddy
 - Cross-platform CLI binaries
 
 ---
@@ -45,15 +44,27 @@ localhost app
 
 ## Installation
 
-### Linux
+### Linux / macOS
+
+Download binary:
 
 ```bash
 chmod +x tunnel
 
-./tunnel http 5000
+sudo mv tunnel /usr/local/bin/
 ```
 
+Verify installation:
+
+```bash
+tunnel
+```
+
+---
+
 ### Windows
+
+Run:
 
 ```bash
 tunnel.exe http 5000
@@ -61,24 +72,36 @@ tunnel.exe http 5000
 
 ---
 
-## Example
+## Usage
+
+Expose local port 5000:
 
 ```bash
-./tunnel http 5000
+tunnel http 5000
 ```
 
 Example output:
-![alt text](./assets/logs.png)
+
+![Tunnel Logs](./assets/logs.png)
+
 ```text
 ✔ Tunnel established
 
 Forwarding:
-https://localhost/t/abc123
+https://tunnel.annuvrat.com/t/abc123
    ↓
 http://localhost:5000
 
 Status: connected
 Protocol: HTTPS + WSS
+```
+
+---
+
+## Example Tunnel URL
+
+```text
+https://tunnel.annuvrat.com/t/<tunnel-id>
 ```
 
 ---
@@ -90,6 +113,16 @@ Protocol: HTTPS + WSS
 - Cobra CLI
 - Docker
 - Caddy
+- Google Cloud Platform (GCP)
+
+---
+
+## Infrastructure
+
+- Dockerized multi-service deployment
+- Automatic TLS provisioning with Caddy + Let's Encrypt
+- Reverse proxy routing via subdomains
+- Hosted on Google Cloud VM
 
 ---
 
@@ -98,5 +131,15 @@ Protocol: HTTPS + WSS
 - Custom subdomains
 - Authentication
 - Persistent tunnels
-- Dashboard UI
+- Web dashboard
 - Metrics & analytics
+- Rate limiting
+- Binary auto-updater
+
+---
+
+## Inspiration
+
+Inspired by tools like:
+- ngrok
+- Cloudflare Tunnel
